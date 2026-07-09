@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "c:\\progetti\\Dicom-Web-NoCache\\DicomWorkstation\\DicomWorkstation.csproj": {}
+    "C:\\progetti\\Dicom-Web-NoCache\\DicomWorkstation\\DicomWorkstation.csproj": {}
   },
   "projects": {
-    "c:\\progetti\\Dicom-Web-NoCache\\DicomWorkstation\\DicomWorkstation.csproj": {
+    "C:\\progetti\\Dicom-Web-NoCache\\DicomWorkstation\\DicomWorkstation.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "c:\\progetti\\Dicom-Web-NoCache\\DicomWorkstation\\DicomWorkstation.csproj",
+        "projectUniqueName": "C:\\progetti\\Dicom-Web-NoCache\\DicomWorkstation\\DicomWorkstation.csproj",
         "projectName": "DicomWorkstation",
-        "projectPath": "c:\\progetti\\Dicom-Web-NoCache\\DicomWorkstation\\DicomWorkstation.csproj",
+        "projectPath": "C:\\progetti\\Dicom-Web-NoCache\\DicomWorkstation\\DicomWorkstation.csproj",
         "packagesPath": "C:\\Users\\marco\\.nuget\\packages\\",
-        "outputPath": "c:\\progetti\\Dicom-Web-NoCache\\DicomWorkstation\\obj\\",
+        "outputPath": "C:\\progetti\\Dicom-Web-NoCache\\DicomWorkstation\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"

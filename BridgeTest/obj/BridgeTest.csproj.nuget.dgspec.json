@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "c:\\progetti\\Dicom-Web-NoCache\\BridgeTest\\BridgeTest.csproj": {}
+    "C:\\progetti\\Dicom-Web-NoCache\\BridgeTest\\BridgeTest.csproj": {}
   },
   "projects": {
-    "c:\\progetti\\Dicom-Web-NoCache\\BridgeTest\\BridgeTest.csproj": {
+    "C:\\progetti\\Dicom-Web-NoCache\\BridgeTest\\BridgeTest.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "c:\\progetti\\Dicom-Web-NoCache\\BridgeTest\\BridgeTest.csproj",
+        "projectUniqueName": "C:\\progetti\\Dicom-Web-NoCache\\BridgeTest\\BridgeTest.csproj",
         "projectName": "BridgeTest",
-        "projectPath": "c:\\progetti\\Dicom-Web-NoCache\\BridgeTest\\BridgeTest.csproj",
+        "projectPath": "C:\\progetti\\Dicom-Web-NoCache\\BridgeTest\\BridgeTest.csproj",
         "packagesPath": "C:\\Users\\marco\\.nuget\\packages\\",
-        "outputPath": "c:\\progetti\\Dicom-Web-NoCache\\BridgeTest\\obj\\",
+        "outputPath": "C:\\progetti\\Dicom-Web-NoCache\\BridgeTest\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"

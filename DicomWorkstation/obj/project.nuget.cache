@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "EsBHQUazTi0=",
+  "dgSpecHash": "cjHu4Ql3yzg=",
   "success": true,
-  "projectFilePath": "c:\\progetti\\Dicom-Web-NoCache\\DicomWorkstation\\DicomWorkstation.csproj",
+  "projectFilePath": "C:\\progetti\\Dicom-Web-NoCache\\DicomWorkstation\\DicomWorkstation.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\marco\\.nuget\\packages\\communitytoolkit.highperformance\\8.4.0\\communitytoolkit.highperformance.8.4.0.nupkg.sha512",
     "C:\\Users\\marco\\.nuget\\packages\\fo-dicom\\5.2.6\\fo-dicom.5.2.6.nupkg.sha512",
