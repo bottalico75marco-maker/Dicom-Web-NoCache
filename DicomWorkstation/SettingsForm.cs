@@ -11,7 +11,7 @@ public class SettingsForm : Form
     private readonly TextBox _txtStorage = new() { Width = 340 };
     private readonly CheckBox _chkEncrypt = new()
     {
-        Text = "Cifra i file in cache (protezione leggera, legata a questo PC)",
+        Text = "Cifra i file in cache (protezione easy, legata a questo PC)",
         AutoSize = true,
     };
     private readonly DataGridView _gridPacs = new()
