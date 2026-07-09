@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>Viewer</title>
+<style>
+  :root {
+    --bg: #101216; --panel: #181b21; --line: #262b33;
+    --text: #cfd6df; --dim: #7c8694; --accent: #58a6b8;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; background: var(--bg); color: var(--text);
+    font: 13px "Segoe UI", system-ui, sans-serif; overflow: hidden; }
+
+  #app { display: grid; grid-template-columns: 230px 1fr; grid-template-rows: 42px 1fr 28px; height: 100%; }
+
+  header { grid-column: 1 / 3; display: flex; align-items: center; gap: 16px;
+    padding: 0 14px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  header .pt { font-weight: 600; letter-spacing: .02em; }
+  header .meta { color: var(--dim); }
+  header .spacer { flex: 1; }
+  header button { background: none; border: 1px solid var(--line); color: var(--text);
+    padding: 4px 12px; border-radius: 3px; cursor: pointer; font: inherit; }
+  header button:hover { border-color: var(--accent); color: var(--accent); }
+  header button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  aside { background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; }
+  aside h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--dim); padding: 12px 14px 6px; font-weight: 600; }
+  .series { padding: 8px 14px; cursor: pointer; border-left: 2px solid transparent; }
+  .series:hover { background: #1e222a; }
+  .series.active { border-left-color: var(--accent); background: #1e222a; }
+  .series .mod { color: var(--accent); font-weight: 600; margin-right: 6px; }
+  .series .cnt { color: var(--dim); float: right; }
+
+  #vp { background: #000; position: relative; outline: none; }
+  #vp canvas { image-rendering: auto; }
+  #empty { position: absolute; inset: 0; display: flex; align-items: center;
+    justify-content: center; color: var(--dim); }
+
+  footer { grid-column: 1 / 3; display: flex; align-items: center; gap: 18px;
+    padding: 0 14px; background: var(--panel); border-top: 1px solid var(--line);
+    color: var(--dim); font-size: 12px; }
+  footer .val { color: var(--text); }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <span class="pt" id="hPatient">—</span>
+    <span class="meta" id="hMeta"></span>
+    <span class="spacer"></span>
+    <button id="btnInvert" type="button">Inverti</button>
+    <button id="btnReset" type="button">Reset</button>
+  </header>
+
+  <aside>
+    <h2>Serie</h2>
+    <div id="seriesList"></div>
+  </aside>
+
+  <div id="vp" tabindex="0"><div id="empty">Caricamento studio…</div></div>
+
+  <footer>
+    <span>Fetta <span class="val" id="fSlice">–</span></span>
+    <span>W/L <span class="val" id="fWl">–</span></span>
+    <span style="margin-left:auto">rotella: scorri · trascina: window/level</span>
+  </footer>
+</div>
+
+<script src="/lib/cornerstone.min.js"></script>
+<script src="/lib/dicomParser.min.js"></script>
+<script src="/lib/cornerstoneWADOImageLoader.bundle.min.js"></script>
+<script>
+(function () {
+  cornerstoneWADOImageLoader.external.cornerstone = cornerstone;
+  cornerstoneWADOImageLoader.external.dicomParser = dicomParser;
+  cornerstoneWADOImageLoader.configure({ useWebWorkers: false });
+
+  const vp = document.getElementById('vp');
+  cornerstone.enable(vp);
+
+  let imageIds = [];
+  let index = 0;
+
+  async function loadStudy() {
+    const uid = new URLSearchParams(location.search).get('study');
+    const r = await fetch('/api/study?uid=' + encodeURIComponent(uid));
+    if (!r.ok) { document.getElementById('empty').textContent = 'Studio non trovato in cache.'; return; }
+    const study = await r.json();
+
+    document.getElementById('hPatient').textContent = study.patientName || study.patientId;
+    document.getElementById('hMeta').textContent =
+      [study.patientId, study.studyDate, study.description].filter(Boolean).join(' · ');
+
+    const list = document.getElementById('seriesList');
+    study.series.forEach((s, i) => {
+      const el = document.createElement('div');
+      el.className = 'series';
+      el.innerHTML = '<span class="mod">' + (s.modality || '?') + '</span>' +
+                     (s.description || 'Serie ' + (s.number || i + 1)) +
+                     '<span class="cnt">' + s.instances.length + '</span>';
+      el.onclick = () => selectSeries(s, el);
+      list.appendChild(el);
+    });
+    if (study.series.length) selectSeries(study.series[0], list.firstChild);
+  }
+
+  function selectSeries(s, el) {
+    document.querySelectorAll('.series').forEach(x => x.classList.remove('active'));
+    el.classList.add('active');
+    imageIds = s.instances.map(u => 'wadouri:' + location.origin + u);
+    index = 0;
+    show();
+  }
+
+  function show() {
+    if (!imageIds.length) return;
+    cornerstone.loadAndCacheImage(imageIds[index]).then(img => {
+      document.getElementById('empty').style.display = 'none';
+      cornerstone.displayImage(vp, img);
+      updateHud();
+    }).catch(err => {
+      document.getElementById('empty').style.display = 'flex';
+      document.getElementById('empty').textContent = 'Immagine non visualizzabile: ' + err;
+    });
+  }
+
+  function updateHud() {
+    document.getElementById('fSlice').textContent = (index + 1) + '/' + imageIds.length;
+    try {
+      const v = cornerstone.getViewport(vp);
+      document.getElementById('fWl').textContent =
+        Math.round(v.voi.windowWidth) + ' / ' + Math.round(v.voi.windowCenter);
+    } catch (e) { /* nessuna immagine ancora */ }
+  }
+
+  // Rotella: scorrimento fette
+  vp.addEventListener('wheel', e => {
+    e.preventDefault();
+    if (!imageIds.length) return;
+    index = Math.min(imageIds.length - 1, Math.max(0, index + (e.deltaY > 0 ? 1 : -1)));
+    show();
+  }, { passive: false });
+
+  // Trascinamento: window/level
+  let drag = null;
+  vp.addEventListener('mousedown', e => { drag = { x: e.clientX, y: e.clientY }; });
+  window.addEventListener('mouseup', () => { drag = null; });
+  window.addEventListener('mousemove', e => {
+    if (!drag) return;
+    const v = cornerstone.getViewport(vp);
+    if (!v) return;
+    v.voi.windowWidth = Math.max(1, v.voi.windowWidth + (e.clientX - drag.x));
+    v.voi.windowCenter += (e.clientY - drag.y);
+    cornerstone.setViewport(vp, v);
+    drag = { x: e.clientX, y: e.clientY };
+    updateHud();
+  });
+
+  // Tastiera: frecce su/giù
+  vp.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight')
+      { index = Math.min(imageIds.length - 1, index + 1); show(); }
+    if (e.key === 'ArrowUp' || e.key === 'ArrowLeft')
+      { index = Math.max(0, index - 1); show(); }
+  });
+
+  document.getElementById('btnReset').onclick = () => { cornerstone.reset(vp); updateHud(); };
+  document.getElementById('btnInvert').onclick = () => {
+    const v = cornerstone.getViewport(vp); v.invert = !v.invert;
+    cornerstone.setViewport(vp, v); };
+
+  window.addEventListener('resize', () => cornerstone.resize(vp));
+
+  loadStudy().then(() => vp.focus());
+})();
+</script>
+</body>
+</html>

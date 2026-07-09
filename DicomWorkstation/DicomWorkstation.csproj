@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>DicomWorkstation</AssemblyName>
+    <RootNamespace>DicomWorkstation</RootNamespace>
+    <!-- Permette la compilazione anche da ambienti non-Windows (CI) -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <!-- Publish single-file -->
+    <PublishSingleFile Condition="'$(Configuration)' == 'Release'">true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <SelfContained Condition="'$(Configuration)' == 'Release'">true</SelfContained>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="fo-dicom" Version="5.2.6" />
+    <!-- Codec nativi (JPEG, JPEG-LS, JPEG2000, RLE) per transcodifica lato server -->
+    <PackageReference Include="fo-dicom.codecs" Version="5.16.7" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4022.49" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Viewer web e librerie JS incorporate nell'eseguibile -->
+    <EmbeddedResource Include="Resources\**\*" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="fo-dicom" Version="5.2.6" />
+    <!-- Si linkano i sorgenti senza dipendenze WinForms/WebView2 -->
+    <Compile Include="../DicomWorkstation/AppConfig.cs" />
+    <Compile Include="../DicomWorkstation/LocalStore.cs" />
+    <Compile Include="../DicomWorkstation/DicomWebData.cs" />
+  </ItemGroup>
+</Project>
