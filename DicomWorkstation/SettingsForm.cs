@@ -9,6 +9,11 @@ public class SettingsForm : Form
     private readonly TextBox _txtAet = new() { Width = 160, CharacterCasing = CharacterCasing.Upper };
     private readonly NumericUpDown _numPort = new() { Minimum = 1, Maximum = 65535, Width = 90 };
     private readonly TextBox _txtStorage = new() { Width = 340 };
+    private readonly CheckBox _chkEncrypt = new()
+    {
+        Text = "Cifra i file in cache (protezione leggera, legata a questo PC)",
+        AutoSize = true,
+    };
     private readonly DataGridView _gridPacs = new()
     {
         Dock = DockStyle.Fill, AllowUserToAddRows = true, AllowUserToDeleteRows = true,
@@ -28,6 +33,7 @@ public class SettingsForm : Form
         _txtAet.Text = cfg.LocalAet;
         _numPort.Value = Math.Clamp(cfg.ListenPort, 1, 65535);
         _txtStorage.Text = cfg.StoragePath;
+        _chkEncrypt.Checked = cfg.EncryptCache;
 
         // Copia di lavoro: si applica solo su OK
         _pacsBinding = new BindingList<RemotePacs>(
@@ -38,7 +44,7 @@ public class SettingsForm : Form
 
     private void BuildLayout()
     {
-        var local = new GroupBox { Text = "Nodo locale", Dock = DockStyle.Top, Height = 120, Padding = new Padding(10) };
+        var local = new GroupBox { Text = "Nodo locale", Dock = DockStyle.Top, Height = 150, Padding = new Padding(10) };
         var t = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3 };
         t.Controls.Add(new Label { Text = "AE Title:", AutoSize = true, Anchor = AnchorStyles.Left }, 0, 0);
         t.Controls.Add(_txtAet, 1, 0);
@@ -53,6 +59,8 @@ public class SettingsForm : Form
             if (fb.ShowDialog(this) == DialogResult.OK) _txtStorage.Text = fb.SelectedPath;
         };
         t.Controls.Add(btnBrowse, 2, 2);
+        t.Controls.Add(_chkEncrypt, 0, 3);
+        t.SetColumnSpan(_chkEncrypt, 3);
         local.Controls.Add(t);
 
         var pacsBox = new GroupBox { Text = "PACS remoti", Dock = DockStyle.Fill, Padding = new Padding(10) };
@@ -85,6 +93,7 @@ public class SettingsForm : Form
         _cfg.LocalAet = _txtAet.Text.Trim() is { Length: > 0 } aet ? aet : "DICOMWS";
         _cfg.ListenPort = (int)_numPort.Value;
         _cfg.StoragePath = _txtStorage.Text.Trim();
+        _cfg.EncryptCache = _chkEncrypt.Checked;
         _cfg.PacsList = _pacsBinding
             .Where(p => !string.IsNullOrWhiteSpace(p.Aet) && !string.IsNullOrWhiteSpace(p.Host))
             .ToList();

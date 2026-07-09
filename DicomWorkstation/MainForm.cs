@@ -1,3 +1,5 @@
+using FellowOakDicom;
+
 namespace DicomWorkstation;
 
 public class MainForm : Form
@@ -37,8 +39,10 @@ public class MainForm : Form
         Width = 1000; Height = 620;
         StartPosition = FormStartPosition.CenterScreen;
 
-        BuildMenu();
+        // BuildMenu DOPO BuildLayout: il dock ancora i controlli in ordine inverso
+        // di aggiunta, quindi il MenuStrip va aggiunto per ultimo per finire in cima.
         BuildLayout();
+        BuildMenu();
         BuildGridColumns();
 
         _chkDate.CheckedChanged += (_, _) =>
@@ -57,13 +61,21 @@ public class MainForm : Form
 
         ReloadSources();
         RestartNode();
+        RefreshCacheView(); // all'avvio mostra subito la cache (es. esami recuperati dopo un crash)
     }
 
     private void BuildMenu()
     {
         var menu = new MenuStrip();
         var tools = new ToolStripMenuItem("&Strumenti");
+        var importDicomdir = new ToolStripMenuItem("Importa &DICOMDIR (CD/USB)…", null,
+            async (_, _) => await ImportDicomdirAsync());
+        var importFolder = new ToolStripMenuItem("Importa &cartella DICOM…", null,
+            async (_, _) => await ImportFolderAsync());
         var settings = new ToolStripMenuItem("&Impostazioni…", null, (_, _) => OpenSettings());
+        tools.DropDownItems.Add(importDicomdir);
+        tools.DropDownItems.Add(importFolder);
+        tools.DropDownItems.Add(new ToolStripSeparator());
         tools.DropDownItems.Add(settings);
         menu.Items.Add(tools);
         MainMenuStrip = menu;
@@ -249,12 +261,97 @@ public class MainForm : Form
         }
     }
 
+    private async Task ImportDicomdirAsync()
+    {
+        using var dlg = new OpenFileDialog
+        {
+            Title = "Seleziona il file DICOMDIR (CD/DVD/USB)",
+            Filter = "DICOMDIR|DICOMDIR|Tutti i file|*.*",
+            CheckFileExists = true,
+        };
+        if (dlg.ShowDialog(this) != DialogResult.OK) return;
+
+        _lblStatus.Text = "Lettura DICOMDIR…";
+        List<string> files;
+        try
+        {
+            files = await Task.Run(() => DicomImport.ReferencedFiles(dlg.FileName));
+        }
+        catch (Exception ex)
+        {
+            _lblStatus.Text = "DICOMDIR non leggibile: " + ex.Message;
+            return;
+        }
+        if (files.Count == 0)
+        {
+            _lblStatus.Text = "Il DICOMDIR non referenzia alcun file presente sul supporto.";
+            return;
+        }
+        await ImportFilesAsync(files);
+    }
+
+    private async Task ImportFolderAsync()
+    {
+        using var dlg = new FolderBrowserDialog
+        {
+            Description = "Seleziona la cartella con i file DICOM da importare",
+            UseDescriptionForTitle = true,
+        };
+        if (dlg.ShowDialog(this) != DialogResult.OK) return;
+
+        _lblStatus.Text = "Scansione della cartella…";
+        var files = await Task.Run(() => DicomImport.ScanFolder(dlg.SelectedPath));
+        if (files.Count == 0)
+        {
+            _lblStatus.Text = "Nessun file DICOM trovato nella cartella.";
+            return;
+        }
+        await ImportFilesAsync(files);
+    }
+
+    /// <summary>Importa i file nella cache locale (transcodifica inclusa, via LocalStore.AddFile).</summary>
+    private async Task ImportFilesAsync(IReadOnlyList<string> paths)
+    {
+        int ok = 0, failed = 0;
+        _lblStatus.Text = $"Import di {paths.Count} file…";
+        await Task.Run(() =>
+        {
+            for (var i = 0; i < paths.Count; i++)
+            {
+                try
+                {
+                    _store.AddFile(DicomFile.Open(paths[i]));
+                    ok++;
+                }
+                catch { failed++; }
+
+                if ((i + 1) % 20 == 0)
+                {
+                    var done = i + 1;
+                    BeginInvoke(() => _lblStatus.Text = $"Import: {done}/{paths.Count}…");
+                }
+            }
+        });
+
+        _lblStatus.Text = $"Import completato: {ok} istanze importate" +
+                          (failed > 0 ? $", {failed} scartate." : ".");
+        if (ok > 0)
+        {
+            _cboSource.SelectedIndex = 0; // mostra la cache locale con gli studi appena importati
+            RefreshCacheView();
+        }
+    }
+
     private void OpenSettings()
     {
+        // Impostazioni protette: la password è l'hostname del PC
+        if (!PasswordDialog.Verifica(this)) return;
+
         using var dlg = new SettingsForm(_cfg);
         if (dlg.ShowDialog(this) == DialogResult.OK)
         {
             _cfg.Save();
+            CacheCrypto.EncryptNewFiles = _cfg.EncryptCache;
             _store.SetStoragePath(_cfg.StoragePath);
             ReloadSources();
             RestartNode();
@@ -277,6 +374,10 @@ public class MainForm : Form
     protected override void OnFormClosed(FormClosedEventArgs e)
     {
         DicomNode.Stop();
+        // Chiusura pulita: la cache non sopravvive alla sessione. Dopo un
+        // crash questo codice non gira, e al riavvio LocalStore ricarica
+        // (o ricostruisce) l'indice dai file rimasti su disco.
+        _store.Clear();
         base.OnFormClosed(e);
     }
 }

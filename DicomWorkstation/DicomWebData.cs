@@ -123,7 +123,7 @@ public static class DicomWebData
         var inst = store.FindInstance(sopUid);
         if (inst == null || !File.Exists(inst.FilePath)) return null;
 
-        var file = DicomFile.Open(inst.FilePath, FileReadOption.ReadLargeOnDemand);
+        var file = CacheCrypto.OpenDicom(inst.FilePath, FileReadOption.ReadLargeOnDemand);
         var pixelData = DicomPixelData.Create(file.Dataset);
         if (frameNumber < 1 || frameNumber > pixelData.NumberOfFrames) return null;
         IByteBuffer frame = pixelData.GetFrame(frameNumber - 1);
@@ -155,7 +155,7 @@ public static class DicomWebData
             if (MetaCache.TryGetValue(inst.SopInstanceUid, out var cached))
                 return cached;
 
-        var ds = DicomFile.Open(inst.FilePath, FileReadOption.SkipLargeTags).Dataset.Clone();
+        var ds = CacheCrypto.OpenDicom(inst.FilePath, FileReadOption.SkipLargeTags).Dataset.Clone();
         ds.Remove(DicomTag.PixelData);
 
         lock (CacheLock)

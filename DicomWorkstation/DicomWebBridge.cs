@@ -33,6 +33,27 @@ public class DicomWebBridge
 
     private record Payload(byte[] Body, int Status, string Headers);
 
+    // ---------- diagnostica ----------
+
+    private static readonly object LogLock = new();
+    private static readonly string LogFile = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "DicomWorkstation", "bridge.log");
+
+    /// <summary>Log di diagnostica (richieste intercettate, console JS del viewer).</summary>
+    public static void LogLine(string msg)
+    {
+        try
+        {
+            lock (LogLock)
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(LogFile)!);
+                File.AppendAllText(LogFile, $"{DateTime.Now:HH:mm:ss.fff} {msg}{Environment.NewLine}");
+            }
+        }
+        catch { /* il log non deve mai far fallire il bridge */ }
+    }
+
     public DicomWebBridge(LocalStore store)
     {
         _store = store;
@@ -62,6 +83,7 @@ public class DicomWebBridge
                 p = new Payload(Encoding.UTF8.GetBytes(ex.ToString()), 500,
                                 "Content-Type: text/plain");
             }
+            LogLine($"{p.Status} {uri.PathAndQuery} ({p.Body.Length} B)");
 
             _uiContext!.Post(_ =>
             {
@@ -231,7 +253,7 @@ public class DicomWebBridge
     {
         var inst = _store.FindInstance(sopUid);
         if (inst == null || !File.Exists(inst.FilePath)) return NotFound();
-        return new Payload(File.ReadAllBytes(inst.FilePath), 200,
+        return new Payload(CacheCrypto.ReadAllBytes(inst.FilePath), 200,
                            "Content-Type: application/dicom");
     }
 

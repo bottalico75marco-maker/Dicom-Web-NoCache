@@ -19,6 +19,7 @@ internal static class Program
         ApplicationConfiguration.Initialize();
 
         var cfg = AppConfig.Load();
+        CacheCrypto.EncryptNewFiles = cfg.EncryptCache;
         var store = new LocalStore(cfg.StoragePath);
 
         Application.Run(new MainForm(cfg, store));

@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 
 namespace DicomWorkstation;
@@ -22,10 +23,15 @@ public class AppConfig
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                      "DicomWorkstation", "storage");
     public List<RemotePacs> PacsList { get; set; } = new();
+    /// <summary>Cifratura leggera dei nuovi file in cache (vedi CacheCrypto).</summary>
+    public bool EncryptCache { get; set; }
 
     private static string ConfigDir =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DicomWorkstation");
-    private static string ConfigFile => Path.Combine(ConfigDir, "config.json");
+    /// <summary>File impostazioni, sempre cifrato (vedi CacheCrypto).</summary>
+    private static string ConfigFile => Path.Combine(ConfigDir, "appsettings.dat");
+    /// <summary>Vecchio formato in chiaro: letto per migrazione, eliminato al primo Save.</summary>
+    private static string LegacyConfigFile => Path.Combine(ConfigDir, "config.json");
 
     private static readonly JsonSerializerOptions JsonOpts = new() { WriteIndented = true };
 
@@ -34,16 +40,23 @@ public class AppConfig
         try
         {
             if (File.Exists(ConfigFile))
-                return JsonSerializer.Deserialize<AppConfig>(File.ReadAllText(ConfigFile)) ?? new AppConfig();
+            {
+                var json = Encoding.UTF8.GetString(CacheCrypto.Unprotect(File.ReadAllBytes(ConfigFile)));
+                return JsonSerializer.Deserialize<AppConfig>(json) ?? new AppConfig();
+            }
+            if (File.Exists(LegacyConfigFile))
+                return JsonSerializer.Deserialize<AppConfig>(File.ReadAllText(LegacyConfigFile)) ?? new AppConfig();
         }
-        catch { /* config corrotta: si riparte dai default */ }
+        catch { /* config corrotta o di un altro PC: si riparte dai default */ }
         return new AppConfig();
     }
 
     public void Save()
     {
         Directory.CreateDirectory(ConfigDir);
-        File.WriteAllText(ConfigFile, JsonSerializer.Serialize(this, JsonOpts));
+        var json = JsonSerializer.Serialize(this, JsonOpts);
+        File.WriteAllBytes(ConfigFile, CacheCrypto.Protect(Encoding.UTF8.GetBytes(json)));
+        try { File.Delete(LegacyConfigFile); } catch { /* non bloccante */ }
     }
 }
 

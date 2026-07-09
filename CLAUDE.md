@@ -130,7 +130,12 @@ primo avvio: comportamento standard, non "aggiustarlo").
 
 1. Estrarre `/usr/share/nginx/html` dall'immagine `ohif/app` (docker pull, o
    layer via registry API come fatto finora)
-2. Eliminare i `*.gz` e `serve.json`
+2. **ATTENZIONE**: nell'immagine i file testuali (js/css/html) esistono solo
+   come `*.gz` precompressi (nginx `gzip_static`): i file "piani" accanto sono
+   **placeholder a 0 byte**. Decomprimere ogni `.gz` sul file omonimo, POI
+   eliminare i `.gz` e `serve.json` (e `app-config.js`: lo genera il bridge).
+   Verificare che nello zip non restino entry a 0 byte (tranne `_headers`):
+   uno zip con i bundle vuoti produce il viewer bianco senza alcun errore.
 3. Rizippare il CONTENUTO (index.html alla radice dello zip) come
    `Resources/ohif-dist.zip`
 4. Verificare in `index.html` che gli asset siano ancora a path assoluti e che

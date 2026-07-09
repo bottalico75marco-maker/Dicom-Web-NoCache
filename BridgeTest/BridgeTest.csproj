@@ -9,6 +9,7 @@
     <PackageReference Include="fo-dicom" Version="5.2.6" />
     <!-- Si linkano i sorgenti senza dipendenze WinForms/WebView2 -->
     <Compile Include="../DicomWorkstation/AppConfig.cs" />
+    <Compile Include="../DicomWorkstation/CacheCrypto.cs" />
     <Compile Include="../DicomWorkstation/LocalStore.cs" />
     <Compile Include="../DicomWorkstation/DicomWebData.cs" />
   </ItemGroup>

@@ -34,6 +34,25 @@ public class ViewerForm : Form
 
             new DicomWebBridge(_store).Attach(_web.CoreWebView2);
 
+            // Diagnostica in bridge.log: esito navigazione, crash del renderer,
+            // console ed eccezioni JS (via DevTools protocol).
+            DicomWebBridge.LogLine($"--- viewer aperto, studio {_studyUid} ---");
+            _web.CoreWebView2.NavigationCompleted += (_, a) =>
+                DicomWebBridge.LogLine($"navigazione: success={a.IsSuccess} err={a.WebErrorStatus}");
+            _web.CoreWebView2.ProcessFailed += (_, a) =>
+                DicomWebBridge.LogLine($"processo WebView2 fallito: {a.ProcessFailedKind}");
+            try
+            {
+                await _web.CoreWebView2.CallDevToolsProtocolMethodAsync("Runtime.enable", "{}");
+                _web.CoreWebView2.GetDevToolsProtocolEventReceiver("Runtime.consoleAPICalled")
+                    .DevToolsProtocolEventReceived += (_, a) =>
+                        DicomWebBridge.LogLine("console: " + a.ParameterObjectAsJson);
+                _web.CoreWebView2.GetDevToolsProtocolEventReceiver("Runtime.exceptionThrown")
+                    .DevToolsProtocolEventReceived += (_, a) =>
+                        DicomWebBridge.LogLine("eccezione JS: " + a.ParameterObjectAsJson);
+            }
+            catch { /* la diagnostica non deve bloccare il viewer */ }
+
             _web.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
             // Viewer OHIF completo; il viewer minimale resta su /viewer.html?study={uid}
             _web.CoreWebView2.Navigate(

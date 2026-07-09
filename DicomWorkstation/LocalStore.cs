@@ -21,7 +21,11 @@ public class LocalStore
     {
         _storagePath = storagePath;
         Directory.CreateDirectory(_storagePath);
-        LoadIndex();
+        lock (_lock)
+        {
+            LoadIndex();
+            RecoverFromDiskNoLock();
+        }
     }
 
     private string IndexFile => Path.Combine(_storagePath, "index.json");
@@ -35,6 +39,7 @@ public class LocalStore
             Directory.CreateDirectory(_storagePath);
             _studies.Clear();
             LoadIndex();
+            RecoverFromDiskNoLock();
         }
         Changed?.Invoke();
     }
@@ -86,41 +91,104 @@ public class LocalStore
             var dir = Path.Combine(_storagePath, Sanitize(studyUid));
             Directory.CreateDirectory(dir);
             var path = Path.Combine(dir, Sanitize(sopUid) + ".dcm");
-            file.Save(path);
+            CacheCrypto.WriteDicom(file, path);
 
-            if (!_studies.TryGetValue(studyUid, out var study))
-            {
-                study = new StudyRecord
-                {
-                    StudyInstanceUid = studyUid,
-                    PatientName = ds.GetSingleValueOrDefault(DicomTag.PatientName, ""),
-                    PatientId = ds.GetSingleValueOrDefault(DicomTag.PatientID, ""),
-                    StudyDate = ds.GetSingleValueOrDefault(DicomTag.StudyDate, ""),
-                    StudyDescription = ds.GetSingleValueOrDefault(DicomTag.StudyDescription, ""),
-                    AccessionNumber = ds.GetSingleValueOrDefault(DicomTag.AccessionNumber, ""),
-                };
-                _studies[studyUid] = study;
-            }
-
-            // Evita duplicati alla ri-ricezione della stessa istanza
-            study.Instances.RemoveAll(i => i.SopInstanceUid == sopUid);
-            study.Instances.Add(new InstanceRecord
-            {
-                SeriesInstanceUid = ds.GetSingleValueOrDefault(DicomTag.SeriesInstanceUID, ""),
-                SopInstanceUid = sopUid,
-                SeriesDescription = ds.GetSingleValueOrDefault(DicomTag.SeriesDescription, ""),
-                Modality = ds.GetSingleValueOrDefault(DicomTag.Modality, ""),
-                SeriesNumber = ds.GetSingleValueOrDefault(DicomTag.SeriesNumber, 0),
-                InstanceNumber = ds.GetSingleValueOrDefault(DicomTag.InstanceNumber, 0),
-                FilePath = path,
-            });
-            study.NumInstances = study.Instances.Count;
-            study.Modalities = string.Join("\\",
-                study.Instances.Select(i => i.Modality).Where(m => m != "").Distinct());
-
+            IndexInstanceNoLock(ds, path);
             SaveIndexNoLock();
         }
         Changed?.Invoke();
+    }
+
+    /// <summary>Aggiorna l'indice con un'istanza già presente su disco in <paramref name="path"/>.</summary>
+    private void IndexInstanceNoLock(DicomDataset ds, string path)
+    {
+        var studyUid = ds.GetSingleValueOrDefault(DicomTag.StudyInstanceUID, "");
+        var sopUid = ds.GetSingleValueOrDefault(DicomTag.SOPInstanceUID, "");
+        if (studyUid == "" || sopUid == "") return;
+
+        if (!_studies.TryGetValue(studyUid, out var study))
+        {
+            study = new StudyRecord
+            {
+                StudyInstanceUid = studyUid,
+                PatientName = ds.GetSingleValueOrDefault(DicomTag.PatientName, ""),
+                PatientId = ds.GetSingleValueOrDefault(DicomTag.PatientID, ""),
+                StudyDate = ds.GetSingleValueOrDefault(DicomTag.StudyDate, ""),
+                StudyDescription = ds.GetSingleValueOrDefault(DicomTag.StudyDescription, ""),
+                AccessionNumber = ds.GetSingleValueOrDefault(DicomTag.AccessionNumber, ""),
+            };
+            _studies[studyUid] = study;
+        }
+
+        // Evita duplicati alla ri-ricezione della stessa istanza
+        study.Instances.RemoveAll(i => i.SopInstanceUid == sopUid);
+        study.Instances.Add(new InstanceRecord
+        {
+            SeriesInstanceUid = ds.GetSingleValueOrDefault(DicomTag.SeriesInstanceUID, ""),
+            SopInstanceUid = sopUid,
+            SeriesDescription = ds.GetSingleValueOrDefault(DicomTag.SeriesDescription, ""),
+            Modality = ds.GetSingleValueOrDefault(DicomTag.Modality, ""),
+            SeriesNumber = ds.GetSingleValueOrDefault(DicomTag.SeriesNumber, 0),
+            InstanceNumber = ds.GetSingleValueOrDefault(DicomTag.InstanceNumber, 0),
+            FilePath = path,
+        });
+        study.NumInstances = study.Instances.Count;
+        study.Modalities = string.Join("\\",
+            study.Instances.Select(i => i.Modality).Where(m => m != "").Distinct());
+    }
+
+    /// <summary>
+    /// Reintegra nell'indice i file .dcm presenti su disco ma non indicizzati:
+    /// dopo un crash (istanza salvata ma indice non aggiornato) o con indice
+    /// corrotto, gli esami in cache tornano visibili al riavvio.
+    /// </summary>
+    private void RecoverFromDiskNoLock()
+    {
+        var indexed = new HashSet<string>(
+            _studies.Values.SelectMany(s => s.Instances).Select(i => i.FilePath),
+            StringComparer.OrdinalIgnoreCase);
+        var recovered = 0;
+        foreach (var dir in Directory.GetDirectories(_storagePath))
+        foreach (var f in Directory.EnumerateFiles(dir, "*.dcm"))
+        {
+            if (indexed.Contains(f)) continue;
+            try
+            {
+                // SkipLargeTags: servono solo i tag testuali, non i pixel
+                var ds = CacheCrypto.OpenDicom(f, FileReadOption.SkipLargeTags).Dataset;
+                IndexInstanceNoLock(ds, f);
+                recovered++;
+            }
+            catch { /* file corrotto o parziale: si ignora */ }
+        }
+        if (recovered > 0) SaveIndexNoLock();
+    }
+
+    /// <summary>
+    /// Svuota cache e indice (chiusura pulita: gli esami non sopravvivono alla
+    /// sessione). Ciò che non si riesce a eliminare resta indicizzato e viene
+    /// reintegrato al prossimo avvio.
+    /// </summary>
+    public void Clear()
+    {
+        lock (_lock)
+        {
+            foreach (var uid in _studies.Keys.ToList())
+            {
+                try
+                {
+                    Directory.Delete(Path.Combine(_storagePath, Sanitize(uid)), true);
+                    _studies.Remove(uid);
+                }
+                catch { /* file bloccato: lo studio ricompare al prossimo avvio */ }
+            }
+            try
+            {
+                if (_studies.Count == 0) File.Delete(IndexFile);
+                else SaveIndexNoLock();
+            }
+            catch { }
+        }
     }
 
     /// <summary>Ricerca nella cache locale (name/id contains, range di date opzionale).</summary>

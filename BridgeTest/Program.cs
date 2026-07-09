@@ -116,5 +116,55 @@ Check("Multipart: corpo > payload", body.Length > frame!.Length);
 Check("Store search per nome", store.Search("rossi", null, null, null).Count == 1);
 Check("Store search per id", store.Search(null, "PAT001", null, null).Count == 1);
 
+// --- Cifratura leggera della cache (CacheCrypto) ---
+// Nuovo studio salvato con cifratura attiva: su disco niente "DICM",
+// ma QIDO/metadata/frames devono funzionare identici (auto-rilevamento).
+CacheCrypto.EncryptNewFiles = true;
+var encStudyUid = DicomUIDGenerator.GenerateDerivedFromUUID().UID;
+var encSopUid = DicomUIDGenerator.GenerateDerivedFromUUID().UID;
+{
+    var ds = new DicomDataset
+    {
+        { DicomTag.SOPClassUID, DicomUID.CTImageStorage },
+        { DicomTag.SOPInstanceUID, encSopUid },
+        { DicomTag.StudyInstanceUID, encStudyUid },
+        { DicomTag.SeriesInstanceUID, DicomUIDGenerator.GenerateDerivedFromUUID().UID },
+        { DicomTag.PatientName, "VERDI^LUIGI" },
+        { DicomTag.PatientID, "PAT002" },
+        { DicomTag.Modality, "CT" },
+        { DicomTag.SeriesNumber, 1 },
+        { DicomTag.InstanceNumber, 1 },
+        { DicomTag.Rows, (ushort)64 },
+        { DicomTag.Columns, (ushort)64 },
+        { DicomTag.BitsAllocated, (ushort)16 },
+        { DicomTag.BitsStored, (ushort)16 },
+        { DicomTag.HighBit, (ushort)15 },
+        { DicomTag.PixelRepresentation, (ushort)0 },
+        { DicomTag.SamplesPerPixel, (ushort)1 },
+        { DicomTag.PhotometricInterpretation, "MONOCHROME2" },
+    };
+    var pixels = new byte[64 * 64 * 2];
+    new Random(42).NextBytes(pixels);
+    var pd = DicomPixelData.Create(ds, true);
+    pd.AddFrame(new MemoryByteBuffer(pixels));
+    store.AddFile(new DicomFile(ds));
+}
+CacheCrypto.EncryptNewFiles = false;
+
+var encPath = store.FindInstance(encSopUid)!.FilePath;
+var rawOnDisk = File.ReadAllBytes(encPath);
+Check("Crypto: file su disco non è DICOM in chiaro",
+    !(rawOnDisk.Length > 132 && rawOnDisk[128] == 'D' && rawOnDisk[129] == 'I' && rawOnDisk[130] == 'C' && rawOnDisk[131] == 'M'));
+Check("Crypto: metadata leggibili dal file cifrato",
+    DicomWebData.Metadata(store, encStudyUid) is { } mj &&
+    JsonDocument.Parse(mj).RootElement.GetArrayLength() == 1);
+var encFrame = DicomWebData.GetFrame(store, encSopUid, 1);
+Check("Crypto: frame dal file cifrato", encFrame != null && encFrame.Length == 64 * 64 * 2);
+Check("Crypto: ReadAllBytes decifra a DICOM valido",
+    CacheCrypto.ReadAllBytes(encPath) is { } plain &&
+    plain.Length > 132 && plain[128] == 'D' && plain[129] == 'I' && plain[130] == 'C' && plain[131] == 'M');
+// I file in chiaro preesistenti restano leggibili (cache mista)
+Check("Crypto: file in chiaro ancora leggibili", DicomWebData.GetFrame(store, sopUid, 1) != null);
+
 Console.WriteLine(failures == 0 ? "\nTUTTI I TEST PASSANO" : $"\n{failures} TEST FALLITI");
 Environment.Exit(failures);
