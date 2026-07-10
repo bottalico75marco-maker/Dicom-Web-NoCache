@@ -1323,8 +1323,7 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\marco\\.nuget\\packages\\": {},
-    "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
+    "C:\\Users\\MarcoBottalico\\.nuget\\packages\\": {}
   },
   "project": {
     "version": "1.0.0",
@@ -1332,22 +1331,16 @@
       "projectUniqueName": "C:\\progetti\\Dicom-Web-NoCache\\DicomWorkstation\\DicomWorkstation.csproj",
       "projectName": "DicomWorkstation",
       "projectPath": "C:\\progetti\\Dicom-Web-NoCache\\DicomWorkstation\\DicomWorkstation.csproj",
-      "packagesPath": "C:\\Users\\marco\\.nuget\\packages\\",
+      "packagesPath": "C:\\Users\\MarcoBottalico\\.nuget\\packages\\",
       "outputPath": "C:\\progetti\\Dicom-Web-NoCache\\DicomWorkstation\\obj\\",
       "projectStyle": "PackageReference",
-      "fallbackFolders": [
-        "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
-      ],
       "configFilePaths": [
-        "C:\\Users\\marco\\AppData\\Roaming\\NuGet\\NuGet.Config",
-        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
-        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        "C:\\Users\\MarcoBottalico\\AppData\\Roaming\\NuGet\\NuGet.Config"
       ],
       "originalTargetFrameworks": [
         "net8.0-windows"
       ],
       "sources": {
-        "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
         "https://api.nuget.org/v3/index.json": {}
       },
       "frameworks": {
